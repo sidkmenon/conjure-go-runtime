@@ -360,6 +360,26 @@ func WithTLSConfig(conf *tls.Config) ClientOrHTTPClientParam {
 	})
 }
 
+// WithRefreshableTLSConfig allows a user to pass in a refreshable *tls.Config.
+// Note that it is undesirable from a performance perspective to pass in a *refreshable.DefaultRefreshable
+// here, as that takes a dependency on reflect.DeepEqual. Updates to the underlying *tls.Config cause
+// a complete transport refresh, which is a relatively expensive operation.
+// Clients are responsible for passing in a refreshable which fulfills their performance requirements.
+func WithRefreshableTLSConfig(r refreshable.Refreshable) ClientOrHTTPClientParam {
+	return clientOrHTTPClientParamFunc(func(b *httpClientBuilder) error {
+		var err error
+		if r == nil {
+			b.TLSConfig = nil
+		} else {
+			b.TLSConfig, err = refreshingclient.NewRefreshableTLSConfigFromRefreshable(r)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // WithTLSInsecureSkipVerify sets the InsecureSkipVerify field for the HTTP client's tls config.
 // This option should only be used in clients that have way to establish trust with servers.
 // If WithTLSConfig is used, the config's InsecureSkipVerify is set to true.

@@ -17,6 +17,7 @@ package refreshingclient
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -122,6 +123,23 @@ func NewRefreshableTLSConfigFromParams(ctx context.Context, params RefreshableTL
 		return nil, werror.WrapWithContextParams(ctx, err, "failed to build RefreshableTLSConfig")
 	}
 	return WrappedRefreshableTLSConfig{r: r}, nil
+}
+
+func NewRefreshableTLSConfigFromRefreshable(r refreshable.Refreshable) (RefreshableTLSConf, error) {
+	validating, err := refreshable.NewValidatingRefreshable(r, func(i interface{}) error {
+		_, ok := r.Current().(*tls.Config)
+		if !ok {
+			// TODO(smenon): proper error msg.
+			return errors.New("invalid type for refreshable")
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, werror.Wrap(err, "failed to build RefreshableTLSConfig")
+	}
+	return WrappedRefreshableTLSConfig{
+		r: validating,
+	}, nil
 }
 
 // GetTLSConfig returns the most recent valid *tls.Config.
